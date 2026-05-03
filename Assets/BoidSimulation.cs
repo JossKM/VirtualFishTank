@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using UnityEditor.SearchService;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
 
 public class BoidSimulationControl : MonoBehaviour
@@ -22,6 +24,8 @@ public class BoidSimulationControl : MonoBehaviour
     public GameObject splashPrefab = null;
     public GameObject targetObject = null;
     public int numBoidsToSpawn = 10;
+    public float obstacleAvoidanceSpeedScale = 0.5f;
+    public float obstacleAvoidanceMinRange = 0.02f;
     public List<Boid> boids = null;
 
     private void Start()
@@ -74,6 +78,10 @@ public class BoidSimulationControl : MonoBehaviour
         {
             controlMode = ControlMode.Obstacle;
         }
+        if(Input.GetKeyDown(KeyCode.Space))
+        {
+            ResetSim();
+        }
 
         if (Input.GetMouseButtonDown(0))
         {
@@ -89,6 +97,11 @@ public class BoidSimulationControl : MonoBehaviour
         }
     }
 
+    void ResetSim()
+    {
+        SceneManager.LoadScene(0);
+    }
+
     private void SpawnObstacle()
     {
         Instantiate(obstaclePrefab, targetObject.transform.position, Random.rotation); //Instantiate a copy of a prefab for food
@@ -102,10 +115,7 @@ public class BoidSimulationControl : MonoBehaviour
             boids[i].currentLinearAcceleration = Vector3.zero;
         }
 
-        foreach(Boid boid in boids)
-        {
-            boid.currentLinearAcceleration += boid.ObstacleAvoidance(0.8f, boid.accelMax);
-        }
+        ObstacleAvoidanceBehaviour();
 
         FoodArrivalBehaviour();
 
@@ -168,9 +178,9 @@ public class BoidSimulationControl : MonoBehaviour
     {
         for (int i = 0; i < boids.Count; i++) // For each boid...
         {
-            Vector3 accel = boids[i].ObstacleAvoidance(0.02f * boids[i].rigidBody.linearVelocity.magnitude, boids[i].accelMax);
+            Vector3 accel = boids[i].ObstacleAvoidance(obstacleAvoidanceMinRange + obstacleAvoidanceSpeedScale * boids[i].rigidBody.linearVelocity.magnitude, boids[i].accelMax);
             boids[i].currentLinearAcceleration += accel;
-            Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
+          //  Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
         }
     }
 
@@ -180,7 +190,7 @@ public class BoidSimulationControl : MonoBehaviour
         {
             Vector3 accel = boids[i].Wander(0.005f, 0.02f, boids[i].accelMax * 0.2f);
             boids[i].currentLinearAcceleration += accel;
-            Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
+           // Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
         }
     }
 
