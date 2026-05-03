@@ -18,6 +18,8 @@ public class BoidSimulationControl : MonoBehaviour
 
     public GameObject boidPrefab = null;
     public GameObject foodPrefab = null;
+    public GameObject obstaclePrefab = null;
+    public GameObject splashPrefab = null;
     public GameObject targetObject = null;
     public int numBoidsToSpawn = 10;
     public List<Boid> boids = null;
@@ -36,7 +38,7 @@ public class BoidSimulationControl : MonoBehaviour
 
             Boid boidComponent = spawnedBoid.GetComponent<Boid>(); // Get boid component from the newly instantiated copy
             //Randomize properties of each boid within a range!
-            boidComponent.speedMax = Random.Range(0.5f, 1.5f);
+            boidComponent.speedMax = Random.Range(0.3f, 1.2f);
             boidComponent.accelMax = Random.Range(0.5f, 1.5f);
 
             boids.Add(boidComponent); // Add the new object to a list we can use later
@@ -49,6 +51,10 @@ public class BoidSimulationControl : MonoBehaviour
         }
     }
 
+    public void SetControlMode(int mode)
+    {
+        controlMode = (ControlMode)mode;
+    }
 
     private void Update()
     {
@@ -69,12 +75,24 @@ public class BoidSimulationControl : MonoBehaviour
             controlMode = ControlMode.Obstacle;
         }
 
-        if (Input.GetMouseButtonDown(0) && controlMode == ControlMode.Food)
+        if (Input.GetMouseButtonDown(0))
         {
-            SpawnFood();
+            if (controlMode == ControlMode.Food)
+            {
+                SpawnFood();
+
+            }
+            else if (controlMode == ControlMode.Obstacle)
+            {
+                SpawnObstacle();
+            }
         }
     }
 
+    private void SpawnObstacle()
+    {
+        Instantiate(obstaclePrefab, targetObject.transform.position, Random.rotation); //Instantiate a copy of a prefab for food
+    }
 
     private void FixedUpdate()
     {
@@ -100,6 +118,14 @@ public class BoidSimulationControl : MonoBehaviour
         if (didHit)
         {
             targetObject.transform.position = hitInfo.point; // Teleport an object to the point of intersection from the raycast
+
+            //Spawn ripples for visual indication of mouse click
+            if (Input.GetMouseButton(1) || Input.GetMouseButton(0))
+            {
+                GameObject instantiated = Instantiate(splashPrefab, targetObject.transform.position, Quaternion.identity);
+                Destroy(instantiated, 1.0f);
+            }
+        
         }
 
         switch (controlMode)
@@ -117,6 +143,14 @@ public class BoidSimulationControl : MonoBehaviour
                 }
         }
 
+        //If not doing anything, let the boids wander
+        if (!Input.GetMouseButton(0) && !Input.GetMouseButton(1))
+        {
+            WanderBehaviour();
+        }
+
+        
+
         //enforce acceleration limits and apply velocity change
         for (int i = 0; i < boids.Count; i++) // For each boid...
         {
@@ -130,12 +164,32 @@ public class BoidSimulationControl : MonoBehaviour
         Instantiate(foodPrefab, targetObject.transform.position, Random.rotation); //Instantiate a copy of a prefab for food
     }
 
+    public void ObstacleAvoidanceBehaviour()
+    {
+        for (int i = 0; i < boids.Count; i++) // For each boid...
+        {
+            Vector3 accel = boids[i].ObstacleAvoidance(0.02f * boids[i].rigidBody.linearVelocity.magnitude, boids[i].accelMax);
+            boids[i].currentLinearAcceleration += accel;
+            Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
+        }
+    }
+
+    public void WanderBehaviour()
+    {
+        for (int i = 0; i < boids.Count; i++) // For each boid...
+        {
+            Vector3 accel = boids[i].Wander(0.005f, 0.02f, boids[i].accelMax * 0.2f);
+            boids[i].currentLinearAcceleration += accel;
+            Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
+        }
+    }
+
     public void FoodArrivalBehaviour()
     {
         //Have all fish seek food
         for (int i = 0; i < boids.Count; i++) // For each boid...
         {
-            float foodSeekRadius = 0.8f;
+            float foodSeekRadius = 0.95f;
             Collider[] colliders = Physics.OverlapSphere(boids[i].transform.position, foodSeekRadius);
 
             Food closestFood = null;
@@ -154,9 +208,10 @@ public class BoidSimulationControl : MonoBehaviour
                 }
             }
             
+            //If there is a food nearby
             if(closestFood != null)
             {
-                Vector3 accel = boids[i].Arrive(closestFood.transform.position, boids[i].accelMax, 0.05f, 0.3f);
+                Vector3 accel = boids[i].Arrive(closestFood.transform.position, boids[i].accelMax, 0.03f, 0.3f);
                 boids[i].currentLinearAcceleration += accel;
                 Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
             }
@@ -168,15 +223,15 @@ public class BoidSimulationControl : MonoBehaviour
         for (int i = 0; i < boids.Count; i++) // For each boid...
         {
             //Call the Seek function on each boid to calculate an acceleration vector
-            Vector3 accel = boids[i].Seek(targetObject.transform.position, boids[i].accelMax);
-
             if (Input.GetMouseButton(0))
             {
+                Vector3 accel = boids[i].Seek(targetObject.transform.position, boids[i].accelMax);
                 boids[i].currentLinearAcceleration += accel;
                 Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
             }
             else if (Input.GetMouseButton(1))
             {
+                Vector3 accel = boids[i].Seek(targetObject.transform.position, boids[i].accelMax);
                 boids[i].currentLinearAcceleration -= accel;
                 Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
             }
@@ -189,24 +244,19 @@ public class BoidSimulationControl : MonoBehaviour
         for (int i = 0; i < boids.Count; i++) // For each boid...
         {
             //Call the Pursue function on each boid to calculate an acceleration vector
-            Vector3 accel = boids[i].Pursue(targetObject.transform.position, boids[i].accelMax, boids[i].speedMax);
 
             if (Input.GetMouseButton(0))
             {
+                Vector3 accel = boids[i].Pursue(targetObject.transform.position, boids[i].accelMax, boids[i].speedMax);
                 boids[i].rigidBody.linearVelocity += accel * Time.fixedDeltaTime; // Apply acceleration
                 Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
             }
             else if (Input.GetMouseButton(1))
             {
+                Vector3 accel = boids[i].Pursue(targetObject.transform.position, boids[i].accelMax, boids[i].speedMax);
                 boids[i].rigidBody.linearVelocity -= accel * Time.fixedDeltaTime; // Apply acceleration
                 Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
             }
-
-
-            boids[i].rigidBody.linearVelocity += accel * Time.fixedDeltaTime; // Apply acceleration
-            Debug.DrawRay(boids[i].transform.position, accel, Color.green); // Draw acceleration
         }
     }
-
-
 }

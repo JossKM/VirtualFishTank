@@ -19,6 +19,15 @@ public class Boid : MonoBehaviour
         Debug.DrawRay(transform.position, rigidBody.linearVelocity, Color.red);
     }
 
+    //Seek a random point ahead in a sphere ahead of the boid
+    public Vector3 Wander(float distance, float radius, float acceleration)
+    {
+        Vector3 sphereCenter = transform.position + transform.forward * distance;
+        Vector3 randomPoint = sphereCenter + (radius * Random.insideUnitSphere);
+
+        return Seek(randomPoint, acceleration);
+    }
+
     public Vector3 Seek(Vector3 target, float acceleration)
     {
         //Get displacement vector to target
@@ -98,29 +107,68 @@ public class Boid : MonoBehaviour
         Ray whiskerLeft = new Ray(transform.position,  Quaternion.AngleAxis(-20, transform.up) * transform.forward);
         Ray whiskerRight = new Ray(transform.position, Quaternion.AngleAxis(20, transform.up) * transform.forward);
 
+        //Whiskers... above and below
+        Ray whiskerUp = new Ray(transform.position, Quaternion.AngleAxis(-20, transform.right) * transform.forward);
+        Ray whiskerDown = new Ray(transform.position, Quaternion.AngleAxis(20, transform.right) * transform.forward);
+
         RaycastHit hitInfoLeft;
         RaycastHit hitInfoRight;
+        RaycastHit hitInfoUp;
+        RaycastHit hitInfoDown;
 
         bool didHitLeft = Physics.Raycast(whiskerLeft, out hitInfoLeft, lookaheadDistance);
         if (didHitLeft)
         {
             //Turn right
             accelOut = transform.right * acceleration;
-            Debug.DrawLine(whiskerRight.origin, hitInfoLeft.point, Color.red) ;
+            Debug.DrawLine(transform.position, hitInfoLeft.point, Color.red) ;
         } else
         {
-            Debug.DrawRay(whiskerLeft.origin, whiskerLeft.direction * lookaheadDistance, Color.yellow);
+            Debug.DrawRay(transform.position, whiskerLeft.direction * lookaheadDistance, Color.yellow);
         }
 
         bool didHitRight = Physics.Raycast(whiskerRight, out hitInfoRight, lookaheadDistance);
-        if(didHitRight )
+        if (didHitRight)
         {
             //Turn left
             accelOut = -transform.right * acceleration;
-            Debug.DrawLine(whiskerRight.origin, hitInfoRight.point, Color.red);
-        } else
+            Debug.DrawLine(transform.position, hitInfoRight.point, Color.red);
+        }
+        else
         {
-            Debug.DrawRay(whiskerLeft.origin, whiskerRight.direction * lookaheadDistance, Color.yellow);
+            Debug.DrawRay(transform.position, whiskerRight.direction * lookaheadDistance, Color.yellow);
+        }
+
+        bool didHitUp = Physics.Raycast(whiskerLeft, out hitInfoUp, lookaheadDistance);
+        if (didHitLeft)
+        {
+            //Turn down
+            accelOut = -transform.up * acceleration;
+            Debug.DrawLine(transform.position, hitInfoUp.point, Color.red);
+        }
+        else
+        {
+            Debug.DrawRay(transform.position, whiskerUp.direction * lookaheadDistance, Color.yellow);
+        }
+
+        bool didHitDown = Physics.Raycast(whiskerLeft, out hitInfoDown, lookaheadDistance);
+        if (didHitLeft)
+        {
+            //Turn up
+            accelOut = transform.up * acceleration;
+            Debug.DrawLine(transform.position, hitInfoDown.point, Color.red);
+        }
+        else
+        {
+            Debug.DrawRay(transform.position, whiskerDown.direction * lookaheadDistance, Color.yellow);
+        }
+
+        if(didHitLeft && didHitRight && didHitUp && didHitDown)
+        {
+            //Turn around!
+            accelOut = -transform.forward * acceleration;
+
+            Debug.DrawLine(transform.position, transform.forward, Color.red);
         }
 
         return accelOut;
